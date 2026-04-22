@@ -191,7 +191,6 @@ export default function MediaPage({ setPage }) {
       processMasterImage(url)
     }
   }
-
   const forceDownload = () => {
     if (!finalImage) return
     const a = document.createElement('a')
@@ -200,7 +199,13 @@ export default function MediaPage({ setPage }) {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    }
+  }
+
+  const shareToApp = (scheme) => {
+    forceDownload()
+    setTimeout(() => {
+      window.location.href = scheme
+    }, 600)
   }
 
   return (
