@@ -87,13 +87,24 @@ export default function MediaPage({ setPage }) {
   const startCamera = async () => {
     setCapturedImages([]) // Reset for a new session
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } 
-      })
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Localhost secure context error: navigator.mediaDevices no está disponible.")
+      }
+
+      let stream;
+      try {
+        // Try requesting front camera (iPhone/Mobile preference)
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      } catch(e) {
+        // Fallback for Desktop/Mac if 'user' isn't recognized or available
+        stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      }
+
       streamRef.current = stream
       setShowWebcam(true)
     } catch (err) {
-      console.warn("Camera access denied or device not found. Falling back to native file picker.", err)
+      console.warn("Camera failed:", err)
+      alert("Error de cámara: " + err.message + "\n\nAsegúrate de haber dado permisos y estar en localhost.")
       const fallbackInput = document.getElementById('cameraCapture')
       if (fallbackInput) fallbackInput.click()
     }
