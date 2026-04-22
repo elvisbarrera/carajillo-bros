@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLang } from './LangContext.jsx'
 
 function CameraIcon({ className = "w-6 h-6" }) {
@@ -62,13 +62,85 @@ function PackageCard({
 
 export default function MediaPage({ setPage }) {
   const { t } = useLang()
+  const [capturedImage, setCapturedImage] = useState(null)
+  const [showWebcam, setShowWebcam] = useState(false)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
+    return () => {
+      // Cleanup camera on unmount
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
   }, [])
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } 
+      })
+      streamRef.current = stream
+      setShowWebcam(true)
+      // wait for React to mount the video element
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+        }
+      }, 50)
+    } catch (err) {
+      console.warn("Camera access denied or device not found. Falling back to native file picker.", err)
+      const fallbackInput = document.getElementById('cameraCapture')
+      if (fallbackInput) fallbackInput.click()
+    }
+  }
+
+  const takePhoto = () => {
+    if (!videoRef.current) return
+    const canvas = document.createElement('canvas')
+    canvas.width = videoRef.current.videoWidth
+    canvas.height = videoRef.current.videoHeight
+    const ctx = canvas.getContext('2d')
+    // Draw the reflected video so it resembles the preview
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+    
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    setCapturedImage(dataUrl)
+    stopCamera()
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+    }
+    streamRef.current = null
+    setShowWebcam(false)
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const imageUrl = URL.createObjectURL(file)
+      setCapturedImage(imageUrl)
+    }
+  }
 
   return (
     <div className="animate-fade-in bg-white min-h-screen">
+      {/* Hidden file input to trigger native camera */}
+      <input 
+        id="cameraCapture"
+        type="file" 
+        accept="image/*" 
+        capture="user" 
+        onChange={handleFileChange} 
+        className="hidden" 
+      />
       {/* Hero Section */}
       <div className="relative bg-black overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03] bg-noise pointer-events-none" />
@@ -85,9 +157,14 @@ export default function MediaPage({ setPage }) {
             <img src="/img/logo.png" alt="Carajillo Bros" className="w-40 sm:w-52 object-contain" />
           </div>
 
-          <div className="inline-flex items-center justify-center p-3 rounded-full bg-neutral-900 border border-neutral-800 text-beige mb-6">
-             <CameraIcon className="w-8 h-8" />
-          </div>
+          <button 
+            type="button"
+            onClick={startCamera}
+            className="inline-flex items-center justify-center p-3 rounded-full bg-neutral-900 border border-neutral-800 text-beige mb-6 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+            aria-label="Take a selfie"
+          >
+             <CameraIcon className="w-8 h-8 pointer-events-none" />
+          </button>
 
           <p className="font-mono text-[10px] tracking-[0.3em] text-[#cba677] uppercase mb-4">
             {t.media.heroOverline}
@@ -105,6 +182,45 @@ export default function MediaPage({ setPage }) {
         
         <div className="h-0.5 bg-gradient-to-r from-transparent via-[#cba677] to-transparent" />
       </div>
+
+      {/* Captured Image Frame (Polaroid Placeholder) */}
+      {!showWebcam && capturedImage && (
+        <div className="px-6 pt-12 pb-4 max-w-sm mx-auto animate-fade-up">
+          <div className="bg-white p-3 pb-8 rounded shadow-[0_10px_40px_rgba(0,0,0,0.15)] -rotate-2 transform hover:rotate-0 transition-transform duration-500 max-w-[280px] mx-auto">
+            <img 
+              src={capturedImage} 
+              alt="Tu evento con Carajillo Bros" 
+              className="w-full aspect-[3/4] object-cover bg-neutral-100 rounded-sm" 
+            />
+            <p className="font-display font-medium text-center mt-5 text-xl text-neutral-800" style={{ fontFamily: '"Cormorant", serif' }}>
+              Carajillo Bros
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* WebRTC Camera Modal Overlay */}
+      {showWebcam && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur flex flex-col items-center justify-center animate-fade-in touch-none">
+          <video 
+            ref={videoRef} 
+            playsInline 
+            autoPlay 
+            muted
+            className="w-full h-full max-w-md object-cover rounded-xl mt-safe"
+            style={{ transform: "scaleX(-1)" }} 
+          />
+          <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-6 px-6">
+            <button onClick={stopCamera} className="text-white hover:text-neutral-300 font-mono text-[10px] tracking-widest uppercase transition-colors">
+              Cancelar
+            </button>
+            <button onClick={takePhoto} className="w-16 h-16 rounded-full border-4 border-white/50 relative flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
+               <span className="w-12 h-12 bg-white rounded-full"></span>
+            </button>
+            <div className="w-16"></div> {/* Spacer for centering */}
+          </div>
+        </div>
+      )}
 
       {/* Packages Grid */}
       <main className="px-4 sm:px-6 py-12 max-w-5xl mx-auto">
