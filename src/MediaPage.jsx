@@ -77,13 +77,7 @@ export default function MediaPage({ setPage }) {
     }
   }, [])
 
-  useEffect(() => {
-    if (showWebcam && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(err => console.warn("Video play failed:", err))
-    }
-  }, [showWebcam])
-
+  // We no longer need the useEffect because we will use a callback ref directly on the video
   const startCamera = async () => {
     setCapturedImages([]) // Reset for a new session
     try {
@@ -230,11 +224,17 @@ export default function MediaPage({ setPage }) {
             </div>
           </div>
           <video 
-            ref={videoRef} 
+            ref={(el) => {
+              videoRef.current = el
+              if (el && streamRef.current && el.srcObject !== streamRef.current) {
+                el.srcObject = streamRef.current
+                el.play().catch(() => {})
+              }
+            }}
             playsInline 
             autoPlay 
             muted
-            className="w-full h-full max-w-md object-cover rounded-xl mt-safe"
+            className="w-full h-full max-w-md object-cover rounded-xl mt-safe bg-neutral-900 border border-neutral-800"
             style={{ transform: "scaleX(-1)" }} 
           />
           <div className="absolute bottom-12 left-0 right-0 flex items-center justify-center gap-6 px-6">
