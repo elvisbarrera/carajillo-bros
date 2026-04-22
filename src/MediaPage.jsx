@@ -77,6 +77,13 @@ export default function MediaPage({ setPage }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (showWebcam && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(err => console.warn("Video play failed:", err))
+    }
+  }, [showWebcam])
+
   const startCamera = async () => {
     setCapturedImages([]) // Reset for a new session
     try {
@@ -85,13 +92,6 @@ export default function MediaPage({ setPage }) {
       })
       streamRef.current = stream
       setShowWebcam(true)
-      // wait for React to mount the video element
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play()
-        }
-      }, 50)
     } catch (err) {
       console.warn("Camera access denied or device not found. Falling back to native file picker.", err)
       const fallbackInput = document.getElementById('cameraCapture')
