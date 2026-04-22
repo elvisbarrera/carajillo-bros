@@ -167,14 +167,21 @@ export default function MediaPage({ setPage }) {
             <img src="/img/logo.png" alt="Carajillo Bros" className="w-40 sm:w-52 object-contain" />
           </div>
 
-          <button 
-            type="button"
-            onClick={startCamera}
-            className="inline-flex items-center justify-center p-3 rounded-full bg-neutral-900 border border-neutral-800 text-beige mb-6 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-            aria-label="Take a selfie"
-          >
-             <CameraIcon className="w-8 h-8 pointer-events-none" />
-          </button>
+          <div className="flex flex-col items-center mb-8 relative">
+            <button 
+              type="button"
+              onClick={startCamera}
+              className="relative inline-flex items-center justify-center p-4 rounded-full bg-neutral-900 border border-[#cba677]/30 text-[#cba677] hover:scale-110 active:scale-95 transition-all cursor-pointer group shadow-[0_0_20px_rgba(203,166,119,0.1)]"
+              aria-label="Take a selfie"
+            >
+               {/* Pulsing ring for attention */}
+               <span className="absolute inset-0 rounded-full border border-[#cba677] animate-ping opacity-20 duration-1000"></span>
+               <CameraIcon className="w-8 h-8 pointer-events-none" />
+            </button>
+            <span className="mt-3 font-mono text-[9px] tracking-[0.2em] text-neutral-400 uppercase flex items-center gap-1.5 animate-pulse">
+               {t.nav.menu === 'Menu' ? 'TAP HERE TO START' : 'TOCA AQUÍ PARA INICIAR'}
+            </span>
+          </div>
 
           <p className="font-mono text-[10px] tracking-[0.3em] text-[#cba677] uppercase mb-4">
             {t.media.heroOverline}
