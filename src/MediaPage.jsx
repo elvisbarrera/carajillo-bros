@@ -249,7 +249,7 @@ export default function MediaPage({ setPage }) {
                  <span className="font-mono text-[9px] tracking-widest uppercase text-[#cba677] font-bold">Listos</span>
               </button>
             ) : (
-              <div className="w-16"></div> {/* Spacer for centering when cancel is the only option */}
+              <div className="w-16"></div>
             )}
           </div>
         </div>
