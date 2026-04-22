@@ -140,74 +140,88 @@ export default function MediaPage({ setPage }) {
     setShowWebcam(false)
   }
 
+  const generateCollageBlob = async () => {
+    return new Promise(async (resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      
+      const padding = 40
+      const imgWidth = 800
+      const imgHeight = 600
+      const textSpace = 160
+      
+      canvas.width = imgWidth + (padding * 2)
+      canvas.height = (imgHeight * capturedImages.length) + (padding * (capturedImages.length + 1)) + textSpace
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      let currentY = padding
+      for (const src of capturedImages) {
+        const img = new Image()
+        img.src = src
+        await new Promise(r => img.onload = r)
+        
+        const aspect = img.width / img.height
+        let sx = 0, sy = 0, sw = img.width, sh = img.height
+        if (aspect > (4/3)) {
+          sw = img.height * (4/3)
+          sx = (img.width - sw) / 2
+        } else {
+          sh = img.width * (3/4)
+          sy = (img.height - sh) / 2
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, padding, currentY, imgWidth, imgHeight)
+        currentY += imgHeight + padding
+      }
+
+      ctx.fillStyle = '#cba677'
+      ctx.font = 'bold 24px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('TU EVENTO', canvas.width / 2, currentY + 30)
+
+      ctx.fillStyle = '#171717'
+      ctx.font = '70px "Cormorant", serif'
+      ctx.fillText('Carajillo Bros', canvas.width / 2, currentY + 110)
+
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    })
+  }
+
+  const forceDownload = (blob) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'carajillo_bros_photobooth.jpg'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   const shareCollage = async () => {
     if (capturedImages.length === 0) return
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    
-    // Photobooth strip dimensions
-    const padding = 40
-    const imgWidth = 800
-    const imgHeight = 600
-    const textSpace = 160
-    
-    canvas.width = imgWidth + (padding * 2)
-    canvas.height = (imgHeight * capturedImages.length) + (padding * (capturedImages.length + 1)) + textSpace
+    const blob = await generateCollageBlob()
+    const file = new File([blob], 'carajillo_bros_photobooth.jpg', { type: 'image/jpeg' })
 
-    // White background
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // Draw images
-    let currentY = padding
-    for (const src of capturedImages) {
-      const img = new Image()
-      img.src = src
-      await new Promise(r => img.onload = r)
-      
-      const aspect = img.width / img.height
-      let sx = 0, sy = 0, sw = img.width, sh = img.height
-      if (aspect > (4/3)) {
-        sw = img.height * (4/3)
-        sx = (img.width - sw) / 2
-      } else {
-        sh = img.width * (3/4)
-        sy = (img.height - sh) / 2
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Mi Photobooth - Carajillo Bros',
+        })
+      } catch (e) {
+        // User canceled share or it failed
       }
-      ctx.drawImage(img, sx, sy, sw, sh, padding, currentY, imgWidth, imgHeight)
-      currentY += imgHeight + padding
+    } else {
+      forceDownload(blob)
     }
+  }
 
-    // Draw branding
-    ctx.fillStyle = '#cba677'
-    ctx.font = 'bold 24px monospace'
-    ctx.textAlign = 'center'
-    ctx.fillText('TU EVENTO', canvas.width / 2, currentY + 30)
-
-    ctx.fillStyle = '#171717'
-    ctx.font = '70px "Cormorant", serif'
-    ctx.fillText('Carajillo Bros', canvas.width / 2, currentY + 110)
-
-    // Export and share
-    canvas.toBlob(async (blob) => {
-      const file = new File([blob], 'carajillo_bros_photobooth.jpg', { type: 'image/jpeg' })
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: 'Mi Photobooth - Carajillo Bros',
-          })
-        } catch (e) {
-          console.warn("Share failed or was canceled", e)
-        }
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'carajillo_bros_photobooth.jpg'
-        a.click()
-      }
-    }, 'image/jpeg', 0.9)
+  const downloadCollage = async () => {
+    if (capturedImages.length === 0) return
+    const blob = await generateCollageBlob()
+    forceDownload(blob)
   }
 
   const handleFileChange = (e) => {
@@ -306,7 +320,7 @@ export default function MediaPage({ setPage }) {
             <button onClick={shareCollage} className="flex items-center gap-2 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
               <InstagramIcon className="w-5 h-5"/> Instagram
             </button>
-            <button onClick={shareCollage} className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
+            <button onClick={downloadCollage} className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
               <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
