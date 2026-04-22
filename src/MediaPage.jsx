@@ -62,7 +62,7 @@ function PackageCard({
 
 export default function MediaPage({ setPage }) {
   const { t } = useLang()
-  const [capturedImage, setCapturedImage] = useState(null)
+  const [capturedImages, setCapturedImages] = useState([])
   const [showWebcam, setShowWebcam] = useState(false)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -78,6 +78,7 @@ export default function MediaPage({ setPage }) {
   }, [])
 
   const startCamera = async () => {
+    setCapturedImages([]) // Reset for a new session
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } 
@@ -110,8 +111,12 @@ export default function MediaPage({ setPage }) {
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
     
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-    setCapturedImage(dataUrl)
-    stopCamera()
+
+    setCapturedImages(prev => {
+      const newArr = [...prev, dataUrl]
+      if (newArr.length >= 3) stopCamera()
+      return newArr
+    })
   }
 
   const stopCamera = () => {
@@ -123,10 +128,10 @@ export default function MediaPage({ setPage }) {
   }
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      const imageUrl = URL.createObjectURL(file)
-      setCapturedImage(imageUrl)
+    const files = Array.from(e.target.files).slice(0, 3)
+    if (files.length > 0) {
+      const urls = files.map(f => URL.createObjectURL(f))
+      setCapturedImages(urls)
     }
   }
 
@@ -183,18 +188,24 @@ export default function MediaPage({ setPage }) {
         <div className="h-0.5 bg-gradient-to-r from-transparent via-[#cba677] to-transparent" />
       </div>
 
-      {/* Captured Image Frame (Polaroid Placeholder) */}
-      {!showWebcam && capturedImage && (
+      {/* Photobooth Strip Frame */}
+      {!showWebcam && capturedImages.length > 0 && (
         <div className="px-6 pt-12 pb-4 max-w-sm mx-auto animate-fade-up">
-          <div className="bg-white p-3 pb-8 rounded shadow-[0_10px_40px_rgba(0,0,0,0.15)] -rotate-2 transform hover:rotate-0 transition-transform duration-500 max-w-[280px] mx-auto">
-            <img 
-              src={capturedImage} 
-              alt="Tu evento con Carajillo Bros" 
-              className="w-full aspect-[3/4] object-cover bg-neutral-100 rounded-sm" 
-            />
-            <p className="font-display font-medium text-center mt-5 text-xl text-neutral-800" style={{ fontFamily: '"Cormorant", serif' }}>
-              Carajillo Bros
-            </p>
+          <div className="bg-white p-3 pb-8 rounded shadow-[0_10px_40px_rgba(0,0,0,0.15)] -rotate-2 transform hover:rotate-0 transition-transform duration-500 max-w-[280px] mx-auto flex flex-col gap-3">
+            {capturedImages.map((src, i) => (
+              <img 
+                key={i}
+                src={src} 
+                alt={`Photo ${i+1}`} 
+                className="w-full aspect-[4/3] object-cover bg-neutral-100 rounded-sm" 
+              />
+            ))}
+            <div className="mt-4 flex flex-col items-center">
+              <span className="font-mono text-[9px] tracking-[0.3em] text-[#cba677] uppercase mb-1">Tu Evento</span>
+              <p className="font-display font-medium text-center text-2xl text-neutral-900" style={{ fontFamily: '"Cormorant", serif' }}>
+                Carajillo Bros
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -202,6 +213,11 @@ export default function MediaPage({ setPage }) {
       {/* WebRTC Camera Modal Overlay */}
       {showWebcam && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur flex flex-col items-center justify-center animate-fade-in touch-none">
+          <div className="absolute top-12 left-0 right-0 flex justify-center z-10">
+            <div className="bg-black/60 backdrop-blur text-white px-4 py-1.5 rounded-full font-mono text-xs font-bold tracking-widest uppercase">
+              Foto {capturedImages.length + 1} de 3
+            </div>
+          </div>
           <video 
             ref={videoRef} 
             playsInline 
@@ -217,7 +233,13 @@ export default function MediaPage({ setPage }) {
             <button onClick={takePhoto} className="w-16 h-16 rounded-full border-4 border-white/50 relative flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
                <span className="w-12 h-12 bg-white rounded-full"></span>
             </button>
-            <div className="w-16"></div> {/* Spacer for centering */}
+            {capturedImages.length > 0 ? (
+              <button onClick={stopCamera} className="w-16 h-16 rounded-full border-4 border-[#cba677] relative flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bg-neutral-900 shadow-xl">
+                 <span className="font-mono text-[9px] tracking-widest uppercase text-[#cba677] font-bold">Listos</span>
+              </button>
+            ) : (
+              <div className="w-16"></div> {/* Spacer for centering when cancel is the only option */}
+            )}
           </div>
         </div>
       )}
