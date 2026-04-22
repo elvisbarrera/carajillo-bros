@@ -85,150 +85,121 @@ export default function MediaPage({ setPage }) {
     }
   }, [])
 
-  // We no longer need the useEffect because we will use a callback ref directly on the video
+  const [finalImage, setFinalImage] = useState(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  // Use a callback ref for secure video stream attachment
   const startCamera = async () => {
-    setCapturedImages([]) // Reset for a new session
+    setCapturedImages([])
+    setFinalImage(null)
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Localhost secure context error: navigator.mediaDevices no está disponible.")
       }
-
       let stream;
       try {
-        // Try requesting front camera (iPhone/Mobile preference)
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
       } catch(e) {
-        // Fallback for Desktop/Mac if 'user' isn't recognized or available
-        stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }
-
       streamRef.current = stream
       setShowWebcam(true)
     } catch (err) {
       console.warn("Camera failed:", err)
-      alert("Error de cámara: " + err.message + "\n\nAsegúrate de haber dado permisos y estar en localhost.")
       const fallbackInput = document.getElementById('cameraCapture')
       if (fallbackInput) fallbackInput.click()
     }
-  }
-
-  const takePhoto = () => {
-    if (!videoRef.current) return
-    const canvas = document.createElement('canvas')
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    const ctx = canvas.getContext('2d')
-    // Draw the reflected video so it resembles the preview
-    ctx.translate(canvas.width, 0)
-    ctx.scale(-1, 1)
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
-    
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-
-    setCapturedImages(prev => {
-      const newArr = [...prev, dataUrl]
-      if (newArr.length >= 3) stopCamera()
-      return newArr
-    })
   }
 
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
     }
-    streamRef.current = null
     setShowWebcam(false)
   }
 
-  const generateCollageBlob = async () => {
-    return new Promise(async (resolve) => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      
-      const padding = 40
-      const imgWidth = 800
-      const imgHeight = 600
-      const textSpace = 160
-      
-      canvas.width = imgWidth + (padding * 2)
-      canvas.height = (imgHeight * capturedImages.length) + (padding * (capturedImages.length + 1)) + textSpace
+  const processMasterImage = async (imageUrl) => {
+    setIsProcessing(true)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    const padding = 40
+    const imgWidth = 800
+    const imgHeight = 600
+    const textSpace = 160
+    
+    canvas.width = imgWidth + (padding * 2)
+    canvas.height = imgHeight + (padding * 2) + textSpace
 
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      let currentY = padding
-      for (const src of capturedImages) {
-        const img = new Image()
-        img.src = src
-        await new Promise(r => img.onload = r)
-        
-        const aspect = img.width / img.height
-        let sx = 0, sy = 0, sw = img.width, sh = img.height
-        if (aspect > (4/3)) {
-          sw = img.height * (4/3)
-          sx = (img.width - sw) / 2
-        } else {
-          sh = img.width * (3/4)
-          sy = (img.height - sh) / 2
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, padding, currentY, imgWidth, imgHeight)
-        currentY += imgHeight + padding
-      }
+    const img = new Image()
+    img.src = imageUrl
+    await new Promise(r => img.onload = r)
+    
+    const aspect = img.width / img.height
+    let sx = 0, sy = 0, sw = img.width, sh = img.height
+    if (aspect > (4/3)) {
+      sw = img.height * (4/3)
+      sx = (img.width - sw) / 2
+    } else {
+      sh = img.width * (3/4)
+      sy = (img.height - sh) / 2
+    }
+    
+    ctx.drawImage(img, sx, sy, sw, sh, padding, padding, imgWidth, imgHeight)
 
-      ctx.fillStyle = '#cba677'
-      ctx.font = 'bold 24px monospace'
-      ctx.textAlign = 'center'
-      ctx.fillText('TU EVENTO', canvas.width / 2, currentY + 30)
+    const currentY = padding + imgHeight + padding
 
-      ctx.fillStyle = '#171717'
-      ctx.font = '70px "Cormorant", serif'
-      ctx.fillText('Carajillo Bros', canvas.width / 2, currentY + 110)
+    ctx.fillStyle = '#cba677'
+    ctx.font = 'bold 24px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('TU EVENTO', canvas.width / 2, currentY + 30)
 
-      canvas.toBlob(resolve, 'image/jpeg', 0.9)
-    })
+    ctx.fillStyle = '#171717'
+    ctx.font = '70px "Cormorant", serif'
+    ctx.fillText('Carajillo Bros', canvas.width / 2, currentY + 110)
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+    setFinalImage(dataUrl)
+    setIsProcessing(false)
   }
 
-  const forceDownload = (blob) => {
-    const url = URL.createObjectURL(blob)
+  const takePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas')
+      canvas.width = videoRef.current.videoWidth
+      canvas.height = videoRef.current.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(videoRef.current, 0, 0)
+      const url = canvas.toDataURL('image/jpeg')
+      
+      setCapturedImages([url])
+      stopCamera()
+      processMasterImage(url)
+    }
+  }
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files).slice(0, 1)
+    if (files.length > 0) {
+      const url = URL.createObjectURL(files[0])
+      setCapturedImages([url])
+      processMasterImage(url)
+    }
+  }
+
+  const forceDownload = () => {
+    if (!finalImage) return
     const a = document.createElement('a')
-    a.href = url
+    a.href = finalImage
     a.download = 'carajillo_bros_photobooth.jpg'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
-  const shareCollage = async () => {
-    if (capturedImages.length === 0) return
-    const blob = await generateCollageBlob()
-    const file = new File([blob], 'carajillo_bros_photobooth.jpg', { type: 'image/jpeg' })
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: 'Mi Photobooth - Carajillo Bros',
-        })
-      } catch (e) {
-        // User canceled share or it failed
-      }
-    } else {
-      forceDownload(blob)
-    }
-  }
-
-  const downloadCollage = async () => {
-    if (capturedImages.length === 0) return
-    const blob = await generateCollageBlob()
-    forceDownload(blob)
-  }
-
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files).slice(0, 3)
-    if (files.length > 0) {
-      const urls = files.map(f => URL.createObjectURL(f))
-      setCapturedImages(urls)
     }
   }
 
@@ -292,41 +263,43 @@ export default function MediaPage({ setPage }) {
         <div className="h-0.5 bg-gradient-to-r from-transparent via-[#cba677] to-transparent" />
       </div>
 
-      {/* Photobooth Strip Frame & Share Buttons */}
-      {!showWebcam && capturedImages.length > 0 && (
+      {/* Final Polarid Rendering & Action Buttons */}
+      {!showWebcam && (isProcessing || finalImage) && (
         <div className="px-4 py-12 max-w-sm mx-auto animate-fade-up">
-          <div className="bg-white p-3 pb-8 rounded shadow-[0_10px_40px_rgba(0,0,0,0.15)] -rotate-2 transform hover:rotate-0 transition-transform duration-500 max-w-[280px] mx-auto flex flex-col gap-3">
-            {capturedImages.map((src, i) => (
+          {finalImage ? (
+            <div className="flex flex-col items-center">
               <img 
-                key={i}
-                src={src} 
-                alt={`Photo ${i+1}`} 
-                className="w-full aspect-[4/3] object-cover bg-neutral-100 rounded-sm" 
+                src={finalImage} 
+                alt="Photobooth Polaroid" 
+                className="w-full h-auto bg-white rounded shadow-2xl -rotate-2 transform hover:rotate-0 transition-transform duration-500 pointer-events-auto" 
               />
-            ))}
-            <div className="mt-4 flex flex-col items-center">
-              <span className="font-mono text-[9px] tracking-[0.3em] text-[#cba677] uppercase mb-1">Tu Evento</span>
-              <p className="font-display font-medium text-center text-2xl text-neutral-900" style={{ fontFamily: '"Cormorant", serif' }}>
-                Carajillo Bros
+              <p className="mt-6 text-center text-[10px] uppercase tracking-widest text-[#cba677] font-bold animate-pulse">
+                Mantén presionado para guardar en Fotos
               </p>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <span className="text-[#cba677] font-mono uppercase tracking-widest text-xs animate-pulse">Procesando...</span>
+            </div>
+          )}
 
           {/* Social Share Buttons */}
-          <div className="flex flex-wrap justify-center gap-3 mt-12 mb-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-            <button onClick={shareCollage} className="flex items-center gap-2 bg-[#1877F2] text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
-              <FacebookIcon className="w-5 h-5"/> Facebook
-            </button>
-            <button onClick={shareCollage} className="flex items-center gap-2 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
-              <InstagramIcon className="w-5 h-5"/> Instagram
-            </button>
-            <button onClick={downloadCollage} className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
-              <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-              Descargar
-            </button>
-          </div>
+          {finalImage && (
+            <div className="flex flex-wrap justify-center gap-3 mt-10 mb-4 animate-fade-up" style={{ animationDelay: '0.3s' }}>
+              <button onClick={() => shareToApp("fb://")} className="flex items-center gap-2 bg-[#1877F2] text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
+                <FacebookIcon className="w-5 h-5"/> Facebook
+              </button>
+              <button onClick={() => shareToApp("instagram://app")} className="flex items-center gap-2 bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
+                <InstagramIcon className="w-5 h-5"/> Instagram
+              </button>
+              <button onClick={forceDownload} className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 text-white px-5 py-3 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-transform text-sm">
+                <svg fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                Descargar
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -335,7 +308,7 @@ export default function MediaPage({ setPage }) {
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur flex flex-col items-center justify-center animate-fade-in touch-none">
           <div className="absolute top-12 left-0 right-0 flex justify-center z-10">
             <div className="bg-black/60 backdrop-blur text-white px-4 py-1.5 rounded-full font-mono text-xs font-bold tracking-widest uppercase">
-              Foto {capturedImages.length + 1} de 3
+              1 Click Polaroid
             </div>
           </div>
           <video 
@@ -359,13 +332,7 @@ export default function MediaPage({ setPage }) {
             <button onClick={takePhoto} className="w-16 h-16 rounded-full border-4 border-white/50 relative flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
                <span className="w-12 h-12 bg-white rounded-full"></span>
             </button>
-            {capturedImages.length > 0 ? (
-              <button onClick={stopCamera} className="w-16 h-16 rounded-full border-4 border-[#cba677] relative flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bg-neutral-900 shadow-xl">
-                 <span className="font-mono text-[9px] tracking-widest uppercase text-[#cba677] font-bold">Listos</span>
-              </button>
-            ) : (
-              <div className="w-16"></div>
-            )}
+            <div className="w-16"></div>
           </div>
         </div>
       )}
