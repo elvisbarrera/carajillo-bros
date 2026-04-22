@@ -91,12 +91,12 @@ const COCKTAILS = [
   },
   {
     id: 5,
-    name: 'WATERMELON PALOMA',
+    name: 'PALOMA',
     tagline: 'Verano en cada sorbo.',
     description: 'El sabor brillante del verano. Tequila blanco combinado con jugo fresco de sandía y la tradicional efervescencia de toronja.',
     badge: 'VERANO',
     badgeColor: 'bg-neutral-900 text-beige',
-    icon: '🍉',
+    icon: '🕊️',
     accentLine: 'from-beige-dark via-beige to-beige-dark',
   },
   {
